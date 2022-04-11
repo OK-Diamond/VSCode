@@ -3,7 +3,7 @@ from math import sqrt, log
 from random import randint
 from os import system, name
 from time import time as get_time
-import sql_commands
+import sql_db
 from sqlite3 import connect as sql_conn
 
 class window_class:
@@ -118,11 +118,8 @@ def main_input(window):
         input_box.draw(window)
         pg.display.flip()
 
-
-
-
 def main_db(window, game_time, username):
-    db, table_name = sql_commands.db_class(sql_conn("leaderboard.db")), "tblLeaderboard"
+    db, table_name = sql_db.db_class(sql_conn("reaction_time_game\\sql_db\\leaderboard.db")), "tblLeaderboard"
     text_display_bank = ["You won in "+str(game_time)+" seconds"]
     db.create_table(table_name)
     rec_exists, user_data = db.get_rec(table_name, username)
