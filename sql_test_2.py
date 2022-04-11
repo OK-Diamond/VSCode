@@ -25,8 +25,7 @@ import mysql.connector
 conn = mysql.connector.connect(host="localhost", user="root", password="ytkxp2KMmXZU75mufMCP")
 cursor = conn.cursor()
 
-table_name = "test_db_1"
-
+table_name = "test_db"
 username, time = "Oliver", 15.4
 
 try:
