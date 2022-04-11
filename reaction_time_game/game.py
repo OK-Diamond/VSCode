@@ -15,11 +15,10 @@ class target_class:
         self.pos, self.radius = pos, radius
     def draw(self, window, dist_to_mouse):
         dist_relative_to_screen = dist_to_mouse/(sqrt(window.width**2 + window.height**2))
-        gradient = 0.2
-        print("dist%", dist_relative_to_screen, "r", max(min(int(-log(dist_relative_to_screen*gradient)/7*255), 255), 0))
+        gradient = 0.5
         
         #r = max(min(int((gradient*255-dist_to_mouse)/gradient), 254), 0)
-        r = max(min(int(-log(dist_relative_to_screen*gradient)/7*255)-50, 255), 0)
+        r = max(min(int(-log(dist_relative_to_screen*gradient)/7*255)+50, 255), 0)
         g = 50
         #b = min(int(dist_to_mouse/gradient), 254)
         b = 255-r
@@ -130,11 +129,11 @@ def main_db(window, game_time, username):
     if rec_exists:
         if game_time < user_data[1]:
             time_change = str(round(user_data[1]-game_time, 3))
-            text_display_bank = text_display_bank+["", "Congrats! You beat your previous fastest", "time by "+time_change+" seconds."]
+            text_display_bank += ["", "Well Done! You beat your previous fastest", "time by "+time_change+" seconds."]
             db.update_rec(table_name, "time", game_time, "userName", username)
-        else: text_display_bank = text_display_bank+["", "Your fastest time", "is "+str(user_data[1])+" seconds. Keep trying!"]
+        else: text_display_bank += ["", "Your fastest time", "is "+str(user_data[1])+" seconds. Keep trying!"]
     else: db.add_rec(username, game_time, table_name)
-    text_display_bank = text_display_bank+["","Leaderboard:"]+db.get_leaderboard(table_name)+["","Your leaderboard position: "+str(db.get_position(table_name,"time","userName",username))] + ["Press Q to quit"]
+    text_display_bank += ["","Leaderboard:"]+db.get_leaderboard(table_name)+["","Your leaderboard position: "+str(db.get_position(table_name,"time","userName",username))] + ["Press Q to quit"]
     display_paragraph(window, text_display_bank)
     running_db = True
     while running_db:
