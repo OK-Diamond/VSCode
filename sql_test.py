@@ -1,30 +1,35 @@
-import pyodbc
-#conn_str = ("Driver={SQL Server Native Client 11.0}; Server=127.0.0.1,3306; Database=DB01; Trusted_Connection=yes;")
-conn_str = ("Driver={ODBC Driver 17 for SQL Server}; Server=UKXXX00123,45600; Database=test_db; UID=root; PWD=ytkxp2KMmXZU75mufMCP;")
+import mysql.connector
+conn = mysql.connector.connect(host="127.0.0.1", user="root", password="ytkxp2KMmXZU75mufMCP", database="leaderboard_db")
+print("conn", conn)
 
-conn = pyodbc.connect(conn_str)
 
-table_name = "test_db"
-username, time = "Oliver", 15.4
+cursor = conn.cursor()
+
+table_name = "leaderboard"
+username, time = "Leo", 100.4
 
 try:
-    conn.cursor().execute(f"CREATE TABLE {table_name} (userName TEXT, time FLOAT, PRIMARY KEY (userName))")
+    cursor.execute(f"CREATE TABLE {table_name} (userName VARCHAR(15), time FLOAT, PRIMARY KEY (userName))")
     print("table created")
 except:
     print("create_table error")
 
 try:
-    conn.cursor().execute(f"""INSERT INTO {table_name} VALUES (?, ?)""", (username, time))
+    cursor.execute(f"INSERT INTO {table_name} VALUES (%s, %s)", (username, time))
     conn.commit()
     print("record added")
 except:
     print("add_rec error")
 
 
-for i in conn.cursor().execute(f"""SELECT * FROM {table_name} WHERE userName = {username}"""):
-    row = i
-try:
-    print([row[0], float(row[1])])
-except:
-    print("get_rec error")
+username = "\""+username+"\""
+cursor.execute(f"SELECT * FROM {table_name}") # WHERE userName = {username}")
+
+result = cursor.fetchall()
+
+for i in result:
+  print(i)
+
+
+print("done")
 
