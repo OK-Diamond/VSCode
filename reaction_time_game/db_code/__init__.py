@@ -55,6 +55,5 @@ class db_class:
             print("get_rec error")
             return ""
     
-    '''def delete_table(self):
-        self.cursor.execute(f"DROP TABLE IF EXISTS {self.table_name}")'''
+    #def delete_table(self): self.cursor.execute(f"DROP TABLE IF EXISTS {self.table_name}")
 

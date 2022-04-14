@@ -4,24 +4,29 @@ from random import randint
 from time import time as get_time
 import mysql.connector
 
+'''
+Features to add:
+    Give the player's name a different colour in the leaderboard to make it stand out from everyone else
+    Make the leaderboard screen resize to fit the window size.
+    Add selectable difficulties, each with their own leaderboards.
+'''
+
+
 class db_class:
-    def __init__(self, conn, table_name:str):
+    def __init__(self, conn, table_name:str) -> None:
         '''Takes conn and table_name as parameters on initialisation
         'conn' is the sql database connection'''
         self.conn = conn
         self.cursor = conn.cursor()
         self.table_name = table_name
-
     def create_table(self, *columns:str) -> None:
         '''Creates a table using the table name specified on initialisation. Columns should be given in SQL format, for example:
         "userName TEXT", "time FLOAT", "PRIMARY KEY (userName)"'''
         sql_inp = f"CREATE TABLE {self.table_name} ("
         for i in columns: sql_inp += i+", "
         sql_inp = sql_inp[:-2]+")"
-        try: 
-            self.cursor.execute(sql_inp)
-        except: print("create_table error")
-
+        try: self.cursor.execute(sql_inp)
+        except: pass #print("create_table error")
     def add_rec(self, *args) -> None:
         '''Adds a record to the database specified with table_name. Each arg is a column of the table.'''
         sql_inp = f"INSERT INTO {self.table_name} VALUES ("
@@ -31,8 +36,7 @@ class db_class:
         try:
             self.cursor.execute(sql_inp, (args))
             self.conn.commit()
-        except: print("add_rec error")
-
+        except: pass #print("add_rec error")
     def update_rec(self, set_name, set_val, key_name, key_val) -> None:
         '''Update a record. 'set' is the record to be updated and 'key' is the primary key'''
         if type(key_val) is str: key_val = "\""+key_val+"\""
@@ -57,22 +61,9 @@ class db_class:
         try:
             self.cursor.execute(sql_inp)
             return self.cursor.fetchall()
-        except:
-            print("get_rec error")
-            return ""
-    
+        except: return "" #print("get_rec error")
     '''def delete_table(self):
         self.cursor.execute(f"DROP TABLE IF EXISTS {self.table_name}")'''
-
-
-
-
-'''
-Features to add:
-    Give the player's name a different colour in the leaderboard to make it stand out from everyone else
-    Make the leaderboard screen resize to fit the window size.
-    Add selectable difficulties, each with their own leaderboards.
-'''
 
 class window_class:
     def __init__(self, width:int, height:int) -> None:
@@ -86,10 +77,9 @@ class target_class:
     def draw(self, window, dist_to_cursor:float) -> None:
         '''Draws the target to the PyGame window. The window still needs to be flipped (using pg.display.flip()) for this to appear.'''
         dist_relative_to_screen = dist_to_cursor/(sqrt(window.width**2 + window.height**2))
-        gradient = 0.5 # You can adust this to change the distance at which the target becomes more red
+        gradient = 1 # You can adust this to change the distance at which the target becomes more red
         r = max(min(int(-log(dist_relative_to_screen*gradient)/7*255)+50, 255), 0)
-        g = 50
-        b = 255-r
+        g, b = 50, 255-r
         pg.draw.circle(window.display, [r,g,b], (self.pos[0],self.pos[1]), self.radius, 0)
 
 class cursor_class:
