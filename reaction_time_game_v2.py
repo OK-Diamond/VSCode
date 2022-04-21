@@ -267,7 +267,7 @@ def main_db(window, game_time, username:str, difficulty_level:int) -> None:
     '''The code managing updating the MySQL servers, then displaying the leaderboard.'''
     conn = mysql.connector.connect(host="192.168.1.127", user="root", password="ytkxp2KMmXZU75mufMCP", database="leaderboard_db")
     db = db_class(conn, "tbl_leaderboard")
-    db.delete_table()
+    #db.delete_table()
     text_display_bank = [f"You won in {game_time/1000} seconds"]
     db.create_table("userName VARCHAR(15)", "difficulty INT(3)", "time INT(255)", "PRIMARY KEY (userName, difficulty)")
     user_data = db.get_rec(where=f"""userName = \"{username}\" AND difficulty = {difficulty_level}""")
@@ -283,7 +283,7 @@ def main_db(window, game_time, username:str, difficulty_level:int) -> None:
             text_display_bank += ["", "Well Done! You beat your previous fastest", f"time by {time_change/1000} seconds."]
             db.update_rec("time", game_time, f"""userName = \"{username}\" AND difficulty = {difficulty_level}""")
             #print("user_data, game_time", user_data, game_time)
-            user_data[2] = game_time
+            #user_data[2] = game_time
         else: text_display_bank += ["", f"Your fastest time at {difficulty.lower()} difficulty", f"is {user_data[2]/1000} seconds. Keep trying!"]
 
     text_display_bank += ["", "Leaderboard:"]
@@ -296,8 +296,7 @@ def main_db(window, game_time, username:str, difficulty_level:int) -> None:
     #print("user_pos list", db.get_rec("COUNT(*)", where=f"time <= {user_data[2]} AND difficulty = {difficulty_level}", order="time")[0][0])
     user_pos = db.get_rec("COUNT(*)", where=f"time <= {user_data[2]} AND difficulty = {difficulty_level}", order="time")[0][0]
     text_display_bank += ["", f"Your leaderboard position: {user_pos+1}"]
-    text_display_bank += ["(note: may be slightly inaccurate since SQL", " can't compare floats very well)"]
-    text_display_bank += ["Press Q to quit"]
+    text_display_bank += ["(note: may be slightly inaccurate since SQL", " can't compare floats very well)", "Press Q to quit"]
     display_paragraph(window, text_display_bank)
     running_db = True
     while running_db:
