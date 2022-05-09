@@ -8,7 +8,6 @@ import mysql.connector
 Features to add:
     Give the player's name a different colour in the leaderboard to make it stand out from everyone else
     Make the leaderboard screen resize to fit the window size.
-    Add selectable difficulties, each with their own leaderboards.
 '''
 
 
@@ -69,7 +68,6 @@ class window_class:
         '''Hold information on the PyGame window.'''
         self.display, self.height, self.width = pg.display.set_mode((width, height)), height, width
 
-###
 class button_class:
     def __init__(self, pos, font, text="", stored_value="", box_rgb=[250, 250, 250], text_rgb=[0, 0, 0]) -> None:
         '''Class for a text input box.'''
@@ -86,7 +84,7 @@ class button_class:
     def draw(self, window) -> None:
         '''Draws the text imput box and the 'Enter your username' prompt to the PyGame window. The window still needs to be flipped (using pg.display.flip()) for this to appear.'''
         self.__update_width()
-        if self.pressed: # invert colours if the button is held down (tracked with self.pressed)
+        if self.pressed: # Inverts colours if the button is held down (tracked with self.pressed)
             curr_box_rgb = [255-self.box_rgb[0], 255-self.box_rgb[1], 255-self.box_rgb[2]]
             curr_text_rgb = [255-self.text_rgb[0], 255-self.text_rgb[1], 255-self.text_rgb[2]]
             curr_border_rgb = [255-self.border_rgb[0], 255-self.border_rgb[1], 255-self.border_rgb[2]]
@@ -118,7 +116,7 @@ class target_class:
     def draw(self, window, dist_to_cursor:float) -> None:
         '''Draws the target to the PyGame window. The window still needs to be flipped (using pg.display.flip()) for this to appear.'''
         dist_relative_to_screen = dist_to_cursor/(sqrt(pg.display.get_window_size()[0]**2 + pg.display.get_window_size()[1]**2))
-        gradient = 1 # You can adust this to change the distance at which the target becomes more red
+        gradient = 1 # Changes the distance at which the target becomes more red
         r = max(min(int(-log(dist_relative_to_screen*gradient)/7*255)+50, 255), 0)
         g, b = 50, 255-r
         pg.draw.circle(window, [r,g,b], (self.pos[0],self.pos[1]), self.radius, 0)
@@ -166,7 +164,6 @@ class input_box_class:
         window.blit(self.txt_surface, (self.rect.x+5, self.rect.y+2)) # Blit the input box
         pg.draw.rect(window, self.colour, self.rect, 2) # Blit the rect
 
-###
 def update_menu_display(window, font, button_list):
     window.fill((30, 30, 30))
     window.blit(font.render("Select difficulty:", True, pg.Color(200, 220, 200)), (20,20)) # Blit the prompt text
@@ -196,7 +193,6 @@ def display_paragraph(window, text_display_bank:list) -> None:
         window.blit(font.render(text_display_bank[line_pos], True, colour), (x_pos, font_size*line_pos+y_pos))
     pg.display.flip()
 
-###
 def main_menu(window) -> tuple[list, int]:
     '''The main loop for the main menu. Returns the window size for the game and the number of targets as a integer'''
     font_size = 25
@@ -256,7 +252,7 @@ def main_input(window) -> str:
         input_box.draw(window)
         pg.display.flip()
 
-def tuple_to_list(x):
+def tuple_to_list(x:tuple) -> list:
     temp, x = list(x), []
     for i in temp[0]: x.append(i)
     return x
@@ -265,7 +261,7 @@ def main_db(window, game_time, username:str, difficulty_level:int) -> None:
     game_time = int(game_time*1000)
     difficulty = ["Easy", "Medium", "Hard"][difficulty_level-1]
     '''The code managing updating the MySQL servers, then displaying the leaderboard.'''
-    conn = mysql.connector.connect(host="192.168.1.127", user="root", password="ytkxp2KMmXZU75mufMCP", database="leaderboard_db")
+    conn = mysql.connector.connect(host="127.0.0.1", user="root", password="ytkxp2KMmXZU75mufMCP", database="leaderboard_db")
     db = db_class(conn, "tbl_leaderboard")
     #db.delete_table()
     text_display_bank = [f"You won in {game_time/1000} seconds"]
@@ -277,27 +273,26 @@ def main_db(window, game_time, username:str, difficulty_level:int) -> None:
         text_display_bank += [f"Record added for {username} on {difficulty.lower()} difficuly."]
     else:
         user_data = tuple_to_list(user_data)
-        #print("user_data", user_data, type(user_data))
         if game_time < user_data[2]:
-            time_change = str(round(user_data[2]-game_time, 3))
+            time_change = round(user_data[2]-game_time, 3)
             text_display_bank += ["", "Well Done! You beat your previous fastest", f"time by {time_change/1000} seconds."]
             db.update_rec("time", game_time, f"""userName = \"{username}\" AND difficulty = {difficulty_level}""")
-            #print("user_data, game_time", user_data, game_time)
-            #user_data[2] = game_time
         else: text_display_bank += ["", f"Your fastest time at {difficulty.lower()} difficulty", f"is {user_data[2]/1000} seconds. Keep trying!"]
 
     text_display_bank += ["", "Leaderboard:"]
-    #print("database:", db.get_rec(order="time"))
     leaderboard_bank = db.get_rec("*", where=f"difficulty = {difficulty_level}", order="time", limit=10)
     for position in range(len(leaderboard_bank)):
         text_display_bank += [f"{position+1} - {leaderboard_bank[position][0]} with a time of {leaderboard_bank[position][2]/1000} seconds"]
-    #print("user_data", user_data)
-    #print("user_pos list", db.get_rec("*", where=f"time <= {user_data[2]} AND difficulty = {difficulty_level}", order="time"))
-    #print("user_pos list", db.get_rec("COUNT(*)", where=f"time <= {user_data[2]} AND difficulty = {difficulty_level}", order="time")[0][0])
-    user_pos = db.get_rec("COUNT(*)", where=f"time <= {user_data[2]} AND difficulty = {difficulty_level}", order="time")[0][0]
-    text_display_bank += ["", f"Your leaderboard position: {user_pos+1}"]
-    text_display_bank += ["(note: may be slightly inaccurate since SQL", " can't compare floats very well)", "Press Q to quit"]
+    
+    temp_list = []
+    for i in db.get_rec(where=f"difficulty = {difficulty_level}", order="time"):
+        if i[2] <= game_time:
+            temp_list.append(i)
+    #print("temp_list", temp_list, type(temp_list), len(temp_list))
+    text_display_bank += ["", f"Your leaderboard position: {len(temp_list)}"]
+    text_display_bank += ["Press Q to quit"]
     display_paragraph(window, text_display_bank)
+    print(db.get_rec())
     running_db = True
     while running_db:
         for event in pg.event.get():
@@ -307,9 +302,8 @@ def main_db(window, game_time, username:str, difficulty_level:int) -> None:
                 break
 
 if __name__ == '__main__':
-    #pg.display.get_window_size()
     pg.init()
-    window = pg.display.set_mode([800,600])
+    window = pg.display.set_mode([800,600]) #pg.display.get_window_size()
     difficulty_level = main_menu(window)
     window, target_count = pg.display.set_mode([difficulty_level*50+700, difficulty_level*50+500]), 5+difficulty_level*2
     game_time = main_game(window, target_count)
