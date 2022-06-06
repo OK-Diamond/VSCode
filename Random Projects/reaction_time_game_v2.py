@@ -1,8 +1,9 @@
-import pygame as pg
+import pygame as pg # In terminal: py -m pip install pygame
+import mysql.connector # In terminal: py -m pip install mysql-connector-python 
 from math import sqrt, log
 from random import randint
 from time import time as get_time
-import mysql.connector
+
 
 '''
 Features to add:
@@ -182,15 +183,21 @@ def update_game_display(window, cursor: cursor_class, target_bank: list) -> None
     cursor.draw(window)
     pg.display.flip() # Updates the window
 
-def display_paragraph(window, text_display_bank:list) -> None:
+def display_paragraph(window, text_display_bank:list, user_position:int, leaderboard_start_line:int) -> None:
     '''Blits all lines of text in the text_display_bank to the window, then flips the window.
-    I intend to add some kind of atuo-text resizing so that it will always fit the screen later.'''
-    window.fill((30, 30, 30))
-    font_size, colour = 25, pg.Color(200, 220, 200)
-    font = pg.font.SysFont("monospace", font_size)
+    user_position and leaderboard_start_line are used to make the user's name appear in a different colour if they are on the leaderboard.
+    I intend to add some kind of auto-text resizing so that it will always fit the screen later.'''
+    print("user_position, leaderboard_start_line", user_position, leaderboard_start_line)
+    user_position += leaderboard_start_line
+    window.fill([30, 30, 30])
+    text_info_bank = {"standard":{"size":25, "colour":pg.Color(200, 220, 200), "font":pg.font.SysFont("monospace", 25)},
+                    "special":{"size":25, "colour":pg.Color(240, 190, 190), "font":pg.font.SysFont("monospace", 25, True)}}
     x_pos, y_pos = 20, 20
     for line_pos in range(len(text_display_bank)):
-        window.blit(font.render(text_display_bank[line_pos], True, colour), (x_pos, font_size*line_pos+y_pos))
+        if user_position == line_pos: curr_font = "special"
+        else: curr_font = "standard"
+        window.blit(text_info_bank[curr_font]["font"].render(text_display_bank[line_pos], True, text_info_bank[curr_font]["colour"]), (x_pos, text_info_bank[curr_font]["size"]*line_pos+y_pos))
+        print(line_pos, text_display_bank[line_pos])
     pg.display.flip()
 
 def main_menu(window) -> tuple[list, int]:
@@ -253,46 +260,51 @@ def main_input(window) -> str:
         pg.display.flip()
 
 def tuple_to_list(x:tuple) -> list:
+    '''Converts a tuple to a list'''
     temp, x = list(x), []
     for i in temp[0]: x.append(i)
     return x
 
 def main_db(window, game_time, username:str, difficulty_level:int) -> None:
+    '''The code managing updating the MySQL servers, then displaying the leaderboard.'''
     game_time = int(game_time*1000)
     difficulty = ["Easy", "Medium", "Hard"][difficulty_level-1]
-    '''The code managing updating the MySQL servers, then displaying the leaderboard.'''
-    conn = mysql.connector.connect(host="127.0.0.1", user="root", password="ytkxp2KMmXZU75mufMCP", database="leaderboard_db")
-    db = db_class(conn, "tbl_leaderboard")
+    
+    conn = mysql.connector.connect(host="192.168.1.127", user="user1", password="user1pw", database="leaderboard_db")
+    db = db_class(conn, "tbl_leaderboard_"+difficulty.lower())
     #db.delete_table()
     text_display_bank = [f"You won in {game_time/1000} seconds"]
-    db.create_table("userName VARCHAR(15)", "difficulty INT(3)", "time INT(255)", "PRIMARY KEY (userName, difficulty)")
-    user_data = db.get_rec(where=f"""userName = \"{username}\" AND difficulty = {difficulty_level}""")
+    db.create_table("userName VARCHAR(15)", "time INT(255)", "PRIMARY KEY (userName)")
+    user_data = db.get_rec(where=f"""userName = \"{username}\"""")
     if user_data == "" or user_data == []:
-        db.add_rec(username, difficulty_level, game_time)
-        user_data = [username, difficulty_level, game_time]
+        db.add_rec(username, game_time)
+        user_data = [username, game_time]
         text_display_bank += [f"Record added for {username} on {difficulty.lower()} difficuly."]
     else:
         user_data = tuple_to_list(user_data)
-        if game_time < user_data[2]:
-            time_change = round(user_data[2]-game_time, 3)
+        if game_time < user_data[1]:
+            time_change = round(user_data[1]-game_time, 3)
             text_display_bank += ["", "Well Done! You beat your previous fastest", f"time by {time_change/1000} seconds."]
-            db.update_rec("time", game_time, f"""userName = \"{username}\" AND difficulty = {difficulty_level}""")
-        else: text_display_bank += ["", f"Your fastest time at {difficulty.lower()} difficulty", f"is {user_data[2]/1000} seconds. Keep trying!"]
-
+            db.update_rec("time", game_time, f"""userName = \"{username}\"""")
+        elif game_time > user_data[1]:
+            text_display_bank += ["", f"Your fastest time at {difficulty.lower()} difficulty", f"is {user_data[1]/1000} seconds. Keep trying!"]
+        else: text_display_bank += ["You somehow managed to exactly match your personal record!"]
     text_display_bank += ["", "Leaderboard:"]
-    leaderboard_bank = db.get_rec("*", where=f"difficulty = {difficulty_level}", order="time", limit=10)
-    for position in range(len(leaderboard_bank)):
-        text_display_bank += [f"{position+1} - {leaderboard_bank[position][0]} with a time of {leaderboard_bank[position][2]/1000} seconds"]
-    
-    temp_list = []
-    for i in db.get_rec(where=f"difficulty = {difficulty_level}", order="time"):
-        if i[2] <= game_time:
-            temp_list.append(i)
-    #print("temp_list", temp_list, type(temp_list), len(temp_list))
-    text_display_bank += ["", f"Your leaderboard position: {len(temp_list)}"]
+    leaderboard_start_line = len(text_display_bank)-1
+    leaderboard_bank = db.get_rec("*", order="time", limit=100)
+    for position in range(min(len(leaderboard_bank), 10)):
+        text_display_bank += [f"{position+1} - {leaderboard_bank[position][0]} with a time of {leaderboard_bank[position][1]/1000} seconds"]
+    if len(leaderboard_bank) == 100: user_position = ">100"
+    else:
+        temp_list = []
+        for i in leaderboard_bank:
+            if i[1] <= min(game_time, user_data[1]): temp_list.append(i)
+        #print("temp_list", temp_list, type(temp_list), len(temp_list))
+        user_position = len(temp_list)
+    text_display_bank += ["", f"Your leaderboard position: {user_position}"]
     text_display_bank += ["Press Q to quit"]
-    display_paragraph(window, text_display_bank)
-    print(db.get_rec())
+    display_paragraph(window, text_display_bank, user_position, leaderboard_start_line)
+    #print(db.get_rec())
     running_db = True
     while running_db:
         for event in pg.event.get():
@@ -310,4 +322,3 @@ if __name__ == '__main__':
     window = pg.display.set_mode([800,600])
     username = main_input(window)
     main_db(window, game_time, username, difficulty_level)
-    pg.quit()
