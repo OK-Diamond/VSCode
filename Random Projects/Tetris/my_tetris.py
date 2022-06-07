@@ -1,6 +1,7 @@
 import pygame as pg
 from random import randint
 from time import time as get_time
+from math import floor
 
 class gameboard_class:
     def __init__(self, size) -> None:
@@ -20,21 +21,17 @@ class gameboard_class:
             for j in i: print(j, end="")
             print()
     
-    def check_for_block_finish(self, blocktype:int, direction:str="down") -> bool:
+    def check_for_block_finish(self, blocktype:int) -> bool:
         block_finish = False
-        if direction == "down": # Check for any completed rows.
-            for i in range(len(self.board)):
-                for j in range(len(self.board[i])):
-                    if self.board[i][j] == blocktype and (i == len(self.board)-1 or self.board[i+1][j] == 2):
-                        block_finish = True
-        else: # Check if there are any of the given blocktype on the left/right column.
-            for i in range(len(self.board)):
-                if (direction == "left" and self.board[i][0] == blocktype) or (direction == "right" and self.board[i][-1] == blocktype):
+        for i in range(len(self.board)):
+            for j in range(len(self.board[i])):
+                if self.board[i][j] == blocktype and (i == len(self.board)-1 or self.board[i+1][j] == 2):
                     block_finish = True
+        
 
-        if block_finish and direction == "down": # If a match has been found and the blocks are moving downwards.
+        if block_finish: # If a match has been found and the blocks are moving downwards.
             self.convert_board_tiles(1, 2) # 'Solidify' all of the player-controlled blocks.
-        print("check_for_block_finish with blocktype", blocktype, "and direction", direction, ":", block_finish)
+        print("check_for_block_finish with blocktype", blocktype, ":", block_finish)
         return block_finish
 
     def check_for_row_complete(self) -> int:
@@ -62,34 +59,34 @@ class gameboard_class:
             self.convert_board_tiles(3, 2)
             row_to_remove = self.check_for_row_complete()
     
-    def move_blocks_down(self, blocktype, direction="down", reiterate=False, **kwargs):
+    def move_blocks_down(self, blocktype, reiterate=False):
         block_stopped = False
-        block_found = False
+        block_found = False # This prevents a recursion error on an empty board.
         new_board = self.board
-        if direction == "down":
-            for i in range(len(new_board)-2, -1, -1):
-                for j in range(len(new_board[i])-1, -1, -1):
-                    if new_board[i][j] == blocktype:
-                        block_found = True
-                        if new_board[i+1][j] != 2:
-                            new_board[i][j] = 0
-                            new_board[i+1][j] = blocktype
-                        else:
-                            block_stopped = True
-
-        
+        for i in range(len(new_board)-2, -1, -1):
+            for j in range(len(new_board[i])-1, -1, -1):
+                if new_board[i][j] == blocktype:
+                    block_found = True
+                    if new_board[i+1][j] != 2:
+                        new_board[i][j] = 0
+                        new_board[i+1][j] = blocktype
+                    else:
+                        block_stopped = True
 
         if block_stopped == False:
             self.board = new_board
             if reiterate and block_found == True:
-                if not self.check_for_block_finish(blocktype, direction):
-                    self.move_blocks(blocktype, direction, reiterate)
-    def move_blocks_across(self, blocktype, direction):
+                if not self.check_for_block_finish(blocktype):
+                    self.move_blocks_down(blocktype, reiterate)
+
+    def move_blocks_across(self, blocktype, direction, structure_size, lr_offset):
         block_stopped = False
-        block_found = False
         new_board = self.board
-        if direction == "right":
-            #print("len(new_board)", len(new_board), range(len(new_board), -1, -1))
+        max_right_movement = len(self.board)+1 - structure_size
+
+        print("lr_offset", lr_offset)
+        if direction == "right" and lr_offset+1 < max_right_movement:
+            lr_offset += 1
             for i in range(len(new_board)-1, -1, -1):
                 for j in range(len(new_board[i])-2, -1, -1):
                     if new_board[i][j] == blocktype:
@@ -98,8 +95,8 @@ class gameboard_class:
                             new_board[i][j+1] = blocktype
                         else:
                             block_stopped = True
-
-        if direction == "left":
+        if direction == "left" and lr_offset > 0:
+            lr_offset -= 1
             for i in range(len(new_board)):
                 for j in range(1, len(new_board[i])):
                     if new_board[i][j] == blocktype:
@@ -110,6 +107,7 @@ class gameboard_class:
                             block_stopped = True
         if block_stopped == False:
             self.board = new_board
+        return lr_offset
 
     def convert_board_tiles(self, blocktype_1, blocktype_2):
         for i in range(len(self.board)):
@@ -132,7 +130,7 @@ class gameboard_class:
                 pg.draw.rect(display, rgb, rect)
 
 class structure_manager_class:
-    def __init__(self):
+    def __init__(self, board_width):
         self.structure_bank = [
             [ # 0 Rotations
                 [[0,0,0], [1,1,0], [0,1,1]], 
@@ -171,23 +169,23 @@ class structure_manager_class:
                 [[0,1,0], [1,1,1], [0,0,0]]
             ]
         ]
-        self.current_structure = 0
-        self.next_structure = 3
+        self.current_structure, self.next_structure = 0, 3
         self.current_layer = 0
-        self.rotation = 0
-        self.lr_offset = 0
+        self.rotation, self.lr_offset = 0, 0
+        self.lr_offset_default = floor(board_width/2)
     def load_next_structure(self):
         self.current_structure = self.next_structure
         self.next_structure = randint(0, len(self.structure_bank[0])-1)
         self.current_layer, self.rotation = 0, 0
+        self.lr_offset = self.lr_offset_default
     def calc_next_layer(self, board):
         if self.current_layer >= self.get_structure_size()-1:
                 return [0 for i in board[0]]
         layer = self.structure_bank[self.rotation][self.current_structure][self.current_layer]
         self.current_layer += 1
         print("self.current_layer", self.current_layer, self.get_structure_size())
-        right_space = [0 for i in range(round((len(board[0])-len(layer))/2))]
-        left_space = [0 for i in range(len(board[0])-len(layer)-len(right_space))]
+        left_space = [0 for i in range(self.lr_offset)]
+        right_space = [0 for i in range(len(board[0])-len(layer)-len(left_space))]
         #print("left_space, layer, right_space", left_space, layer, right_space)
         to_return = []
         for i in left_space:
@@ -225,7 +223,7 @@ def main() -> None:
     pg.display.set_caption("Tetris")
     active_tile, game_running = False, True
     old_time = get_time()
-    structure_manager = structure_manager_class()
+    structure_manager = structure_manager_class(len(gameboard.get_board()))
     structure_manager.load_next_structure()
 
     # -- Game --
@@ -254,18 +252,18 @@ def main() -> None:
                     break
                 if event.type == pg.KEYDOWN:
                     if event.key == pg.K_a or event.key == pg.K_LEFT:
-                        structure_manager.lr_offset = gameboard.move_blocks(1, "left", structure_manager.get_structure_size(), structure_manager.lr_offset) # Move the structure left.
+                        structure_manager.lr_offset = structure_manager.lr_offset = gameboard.move_blocks_across(1, "left", structure_manager.get_structure_size(), structure_manager.lr_offset) # Move the structure left.
                     elif event.key == pg.K_d or event.key == pg.K_RIGHT:
-                        structure_manager.lr_offset = gameboard.move_blocks(1, "right", structure_manager.get_structure_size(), structure_manager.lr_offset) # Move the structure right.
+                        structure_manager.lr_offset = structure_manager.lr_offset = gameboard.move_blocks_across(1, "right", structure_manager.get_structure_size(), structure_manager.lr_offset) # Move the structure right.
                     elif event.key == pg.K_w or event.key == pg.K_UP:
-                        gameboard.move_blocks(1, "down", True) # Quick-drop the structure.
+                        gameboard.move_blocks_down(1, True) # Quick-drop the structure.
                         gameboard.remove_complete_rows() # Remove all completed rows.
             if get_time()-old_time > 0.8:
                 old_time = get_time()
                 if gameboard.check_for_block_finish(1): # Check if the 1s have finished moving and a new block needs to be generated.
                     gameboard.remove_complete_rows() # Remove all completed rows.
                 else:
-                    gameboard.move_blocks(1) # Move all of the 1s down by 1.
+                    gameboard.move_blocks_down(1) # Move all of the 1s down by 1.
                     gameboard.board, game_over = structure_manager.get_next_layer(gameboard.board) # Load the next layer of the current structure.dd
                     if game_over:
                         print("Game over")
