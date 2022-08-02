@@ -35,9 +35,9 @@ class table():
             else:
                 self.conn.cursor().execute(f"""UPDATE {self.table_name} SET {key} = {value} WHERE {conditions}""")
             self.conn.commit()
-            print(f"Record updated: {key}")
+            #print(f"Record updated: {key}")
         except Error as e:
-            print(f"update_rec failed: {e}")
+            pass #print(f"update_rec failed: {e}")
 
     def list_column(self, column: str) -> None:
         '''Prints every item in the specified column'''

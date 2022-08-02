@@ -1,5 +1,6 @@
 #import pygame
-from os import system, name # Used for the clear() function.
+from os import system, name
+from random import randint # Used for the clear() function.
 import sql_code # A library that I made for interfacing with sqlite3. It doesn't do much in the way of heavy lifting, but it's better than starting from scratch.
 
 def clear() -> None:
@@ -86,17 +87,24 @@ class board_class:
             for diagonal in [-1, 1]: # Check for opposing pieces on diagonals and en passant
                 target = [pos[0]+direction, pos[1]+diagonal]
                 en_passant = True if (len(old_en_passant) > 1 and target == [int(old_en_passant[0]), int(old_en_passant[1])]) else False
-                if (target[0] >= 0 and target[1] <= 1) and (target[1] >= 0 and target[1] <= 7):
+                if target[0] in range(8) and target[1] in range(8):
+                    #print([target[0], target[1]])
                     if self.board[target[0]][target[1]] in opponent_piece_bank or en_passant:
-                        temp_board = board_class(template.encode_to_str())
-                        temp_board.board[pos[0]][pos[1]], temp_board.board[target[0]][target[1]] = " ", piece_type
-                        if en_passant:
-                            temp_board.board[pos[0]][target[1]] = " "
-                        boardlist.append(temp_board.encode_to_str())
+                        if (direction == 1 and target[0] == 7) or (direction == -1 and target[0] == 0): # Pawn promotion on capture
+                            promotion_options = ["Q", "N"] if piece_type == "P" else ["q", "n"]
+                            for promotion in promotion_options:
+                                temp_board = board_class(template.encode_to_str())
+                                temp_board.board[pos[0]][pos[1]], temp_board.board[target[0]][target[1]] = " ", promotion
+                                boardlist.append(temp_board.encode_to_str())
+                        else:
+                            temp_board = board_class(template.encode_to_str())
+                            temp_board.board[pos[0]][pos[1]], temp_board.board[target[0]][target[1]] = " ", piece_type
+                            if en_passant:
+                                temp_board.board[pos[0]][target[1]] = " "
+                            boardlist.append(temp_board.encode_to_str())
                         del temp_board
             if pos[0]+direction in range(8) and self.board[pos[0]+direction][pos[1]] == " ": # Check for moving by 1
-                
-                if (direction == 1 and pos[0]+direction == 7) or (direction == -1 and pos[0]+direction == 0):
+                if (direction == 1 and pos[0]+direction == 7) or (direction == -1 and pos[0]+direction == 0): # Pawn promotion when advancing normally
                     promotion_options = ["Q", "N"] if piece_type == "P" else ["q", "n"]
                     for promotion in promotion_options:
                         temp_board = board_class(template.encode_to_str())
@@ -170,6 +178,9 @@ class board_class:
 
 def process_turn(gameboard:board_class) -> str:
     '''Manages a player's turn, which involve displaying their move options and handling inputs.'''
+    move_bank = gameboard.get_possible_moves()
+    # Here, the user input is hijacked by the computer:
+    #return move_bank[randint(0, len(move_bank)-1)]
     error_msg = ""
     while True:
         clear()
@@ -180,7 +191,6 @@ def process_turn(gameboard:board_class) -> str:
         print("Current Board:")
         gameboard.display_board()
         print("Possible Moves:")
-        move_bank = gameboard.get_possible_moves()
         for i in range(len(move_bank)):
             a = board_class(move_bank[i])
             print(f"{i+1}. {move_bank[i]}")
@@ -202,13 +212,15 @@ def check_for_game_over(gameboard:board_class, previous_moves_bank:list) -> tupl
         return "d", "Draw by the 50-move rule"
     
     white_king_found, black_king_found = False, False
-    
-    for i in gameboard.board or len(gameboard.get_possible_moves() == 0):
+    print(gameboard.board)
+    for i in gameboard.board: # or len(gameboard.get_possible_moves() == 0)
         for j in i:
+            print(j, j=="k")
             if j == "K":
                 white_king_found = True
-            elif j == "k":
+            if j == "k":
                 black_king_found = True
+    print("white_king_found, black_king_found", white_king_found, black_king_found)
     if not white_king_found:
         return "b", "Black wins by checkmate"
     elif not black_king_found:
@@ -248,16 +260,15 @@ def main() -> None:
     sql_connection = sql_code.connect("./ChessMate/chessmate_database.db")
     move_table = move_table_class(sql_connection)
     previous_moves_bank = []
-    gameboard = board_class()
+    #gameboard = board_class()
+    gameboard = board_class("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0")
     game_running = True
     while game_running:
         board1 = gameboard.encode_to_str()
         gameboard = board_class(process_turn(gameboard))
         board2 = gameboard.encode_to_str()
         previous_moves_bank.append([board1, board2])
-        # Manage the halfmove clock
-        #print("previous_moves_bank", previous_moves_bank, "\n\n")
-        
+
         move_table_rec = move_table.list_rec(f"board1 = '{board1}' and board2 = '{board2}'")
         #print(move_table_rec)
         if len(move_table_rec) == 0:
@@ -267,10 +278,9 @@ def main() -> None:
         if result != "":
             game_running = False
     #print(previous_moves_bank)
-    print(game_state, result)
+    
 
     for i in previous_moves_bank:
-        print("i", i, "game_state", game_state, "i[0].split(" ")[1]", i[0].split(" ")[1])
         if game_state == "w":
             if i[0].split(" ")[1] == "w":
                 move_table.update_rec("weight", "weight+4", f"board1 = '{i[0]}' AND board2 = '{i[1]}'")
@@ -283,15 +293,17 @@ def main() -> None:
                 move_table.update_rec("weight", "weight+4", f"board1 = '{i[0]}' AND board2 = '{i[1]}'")
         elif game_state == "d":
             move_table.update_rec("weight", "weight-1", f"board1 = '{i[0]}' AND board2 = '{i[1]}'")
-    print("move_table:")
-    for i in move_table.list_rec():
-        print(i)
+    del previous_moves_bank[0:-3]
+    for i in previous_moves_bank:
+        board_class(i[1]).display_board()
+    #gameboard.display_board()
+    print(result, " - Total moves:", len(previous_moves_bank))
     sql_code.quit(sql_connection)
     return
 
 if __name__ == "__main__":
-    while True:
-        main()
+    #while True:
+    main()
 
 
 
