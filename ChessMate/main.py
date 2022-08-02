@@ -1,5 +1,6 @@
 #import pygame
 import os # Used for the clear() function.
+import sql_code
 
 def clear() -> None:
     '''Clears the console'''
@@ -225,6 +226,7 @@ def check_for_game_over(gameboard:board_class, previous_moves_bank:list) -> tupl
     return "", ""
 
 def main() -> None:
+    sql_connection = sql_code.connect("chessmate_database")
     previous_moves_bank = []
     gameboard = board_class()
     game_running = True
@@ -241,6 +243,34 @@ def main() -> None:
             game_running = False
     #print(previous_moves_bank)
     print(game_state, result)
+    sql_code.quit(sql_connection)
+    return
 
 if __name__ == "__main__":
     main()
+    
+
+
+class move_table_class(sql_code.table):
+    def __init__(self) -> None:
+        sql_code.table.__init__(self, "move_table")
+        try:  # Create table
+            self.conn.cursor().execute(f"""CREATE TABLE {self.table_name} (board1 VARCHAR(90) NOT NULL, board2 VARCHAR(90) NOT NULL, weight INTEGER NOT NULL, PRIMARY KEY (board1, board2)) """)
+            self.conn.commit()
+        except sql_code.Error as e:
+            print(e) #pass
+        return
+    
+    def add_rec(self, board1: str, board2: str, weight: int) -> None:
+        print("add_rec inputs:", board1, board2, weight)
+        try:
+            self.conn.cursor().execute(f"""INSERT INTO {self.table_name} (board1, board2, weight) VALUES (?,?,?)""", [board1, board2, weight])
+            self.conn.commit()
+            print("record added")
+        except sql_code.Error as e:
+            print("add_rec failed:", e)
+        return
+
+
+
+
