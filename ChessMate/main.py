@@ -1,10 +1,10 @@
 #import pygame
-import os # Used for the clear() function.
-import sql_code
+from os import system, name # Used for the clear() function.
+import sql_code # A library that I made for interfacing with sqlite3. It doesn't do much in the way of heavy lifting, but it's better than starting from scratch.
 
 def clear() -> None:
     '''Clears the console'''
-    os.system('cls' if os.name in ('nt', 'dos') else 'clear')
+    system('cls' if name in ('nt', 'dos') else 'clear')
 
 class board_class:
     def __init__(self, encoded_board="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0") -> None:
@@ -185,7 +185,6 @@ def process_turn(gameboard:board_class) -> str:
             a = board_class(move_bank[i])
             print(f"{i+1}. {move_bank[i]}")
             a.display_board()
-        print("halfmove_clock", gameboard.halfmove_clock)
         print("\n", error_msg)
         user_inp = input("Please enter the number of the move that you would like to make: ")
         try:
@@ -219,14 +218,35 @@ def check_for_game_over(gameboard:board_class, previous_moves_bank:list) -> tupl
         for j in i:
             if gameboard.encode_to_str().split(" ")[0:-1] == str(j).split(" ")[0:-1]: # The [0:-1] is used to remove the halfmove clock, which is not tracked for a threefold repetition draw.
                 threefold_repetition_counter += 1
-                print(i, j)
+                #print(i, j)
             if threefold_repetition_counter >= 5: # Requires 5 matches (instead of the expected three) because it counts each other board twice + it counts itself once.
-                print(gameboard.encode_to_str())
-                return "D", "Draw by threefold repetition"
+                #print(gameboard.encode_to_str())
+                return "d", "Draw by threefold repetition"
     return "", ""
 
+class move_table_class(sql_code.table):
+    def __init__(self, connection) -> None:
+        '''Initialises the move table'''
+        sql_code.table.__init__(self, connection, "move_table")
+        try:  # Create table
+            self.conn.cursor().execute(f"""CREATE TABLE {self.table_name} (board1 VARCHAR(90) NOT NULL, board2 VARCHAR(90) NOT NULL, weight INTEGER NOT NULL, PRIMARY KEY (board1, board2)) """)
+            self.conn.commit()
+        except sql_code.Error as e:
+            pass #print(e)
+        return
+    
+    def add_rec(self, board1: str, board2: str, weight: int) -> None:
+        try:
+            self.conn.cursor().execute(f"""INSERT INTO {self.table_name} (board1, board2, weight) VALUES (?,?,?)""", (board1, board2, weight))
+            self.conn.commit()
+            #print("record added")
+        except sql_code.Error as e:
+            pass #print(f"add_rec failed: {e}")
+        return
+
 def main() -> None:
-    sql_connection = sql_code.connect("chessmate_database")
+    sql_connection = sql_code.connect("./ChessMate/chessmate_database.db")
+    move_table = move_table_class(sql_connection)
     previous_moves_bank = []
     gameboard = board_class()
     game_running = True
@@ -236,40 +256,42 @@ def main() -> None:
         board2 = gameboard.encode_to_str()
         previous_moves_bank.append([board1, board2])
         # Manage the halfmove clock
-        print("previous_moves_bank", previous_moves_bank, "\n\n")
+        #print("previous_moves_bank", previous_moves_bank, "\n\n")
         
+        move_table_rec = move_table.list_rec(f"board1 = '{board1}' and board2 = '{board2}'")
+        #print(move_table_rec)
+        if len(move_table_rec) == 0:
+            move_table.add_rec(board1, board2, 50)
+
         game_state, result = check_for_game_over(gameboard, previous_moves_bank)
         if result != "":
             game_running = False
     #print(previous_moves_bank)
     print(game_state, result)
+
+    for i in previous_moves_bank:
+        print("i", i, "game_state", game_state, "i[0].split(" ")[1]", i[0].split(" ")[1])
+        if game_state == "w":
+            if i[0].split(" ")[1] == "w":
+                move_table.update_rec("weight", "weight+4", f"board1 = '{i[0]}' AND board2 = '{i[1]}'")
+            elif i[0].split(" ")[1] == "b":
+                move_table.update_rec("weight", "weight-5", f"board1 = '{i[0]}' AND board2 = '{i[1]}'")
+        elif game_state == "b":
+            if i[0].split(" ")[1] == "w":
+                move_table.update_rec("weight", "weight-5", f"board1 = '{i[0]}' AND board2 = '{i[1]}'")
+            elif i[0].split(" ")[1] == "b":
+                move_table.update_rec("weight", "weight+4", f"board1 = '{i[0]}' AND board2 = '{i[1]}'")
+        elif game_state == "d":
+            move_table.update_rec("weight", "weight-1", f"board1 = '{i[0]}' AND board2 = '{i[1]}'")
+    print("move_table:")
+    for i in move_table.list_rec():
+        print(i)
     sql_code.quit(sql_connection)
     return
 
 if __name__ == "__main__":
-    main()
-    
-
-
-class move_table_class(sql_code.table):
-    def __init__(self) -> None:
-        sql_code.table.__init__(self, "move_table")
-        try:  # Create table
-            self.conn.cursor().execute(f"""CREATE TABLE {self.table_name} (board1 VARCHAR(90) NOT NULL, board2 VARCHAR(90) NOT NULL, weight INTEGER NOT NULL, PRIMARY KEY (board1, board2)) """)
-            self.conn.commit()
-        except sql_code.Error as e:
-            print(e) #pass
-        return
-    
-    def add_rec(self, board1: str, board2: str, weight: int) -> None:
-        print("add_rec inputs:", board1, board2, weight)
-        try:
-            self.conn.cursor().execute(f"""INSERT INTO {self.table_name} (board1, board2, weight) VALUES (?,?,?)""", [board1, board2, weight])
-            self.conn.commit()
-            print("record added")
-        except sql_code.Error as e:
-            print("add_rec failed:", e)
-        return
+    while True:
+        main()
 
 
 

@@ -1,8 +1,9 @@
-from sqlite3 import Connection, Error, connect  # Used to store SQL files
+from sqlite3 import Connection, Error  # Used to store SQL files
+from sqlite3 import connect as conn
 
 def connect(database_name:str) -> Connection:
     '''Returns the database connection, which needs to be passed into most other functions from this file.'''
-    return connect(f"""{database_name}.db""")
+    return conn(database_name)
 
 def quit(connection: Connection):
     '''Commits any unsaved changes and closes the connection to the database.'''
@@ -16,17 +17,27 @@ class table():
         self.conn = connection
         return
 
-    def list_rec(self, key: str, keyfield: str|int) -> None:
-        '''Lists the first rec where 'key' = 'keyfield'.'''
-        if type(keyfield) == str:
-            keyfield = f"\"{keyfield}\""
-        self.conn.cursor().execute(f"""SELECT Board FROM {self.table_name} WHERE {key} = {keyfield}""")
-        row = self.conn.cursor().fetchone()
+    def list_rec(self, conditions: str = "") -> list:
+        '''Lists all recs where the condition is true.'''
+        rec_bank = []
+        if len(conditions) == 0:
+            for row in self.conn.cursor().execute(f"""SELECT * FROM {self.table_name}"""):
+                rec_bank.append(row)
+        else:
+            for row in self.conn.cursor().execute(f"""SELECT * FROM {self.table_name} WHERE {conditions}"""):
+                rec_bank.append(row)
+        return rec_bank
+
+    def update_rec(self, key:str, value, conditions: str = ""):
         try:
-            print(row)
+            if len(conditions) == 0:
+                self.conn.cursor().execute(f"""UPDATE {self.table_name} SET {key} = {value}""")
+            else:
+                self.conn.cursor().execute(f"""UPDATE {self.table_name} SET {key} = {value} WHERE {conditions}""")
+            self.conn.commit()
+            print(f"Record updated: {key}")
         except Error as e:
-            print("Record not found:", e)
-        return
+            print(f"update_rec failed: {e}")
 
     def list_column(self, column: str) -> None:
         '''Prints every item in the specified column'''
